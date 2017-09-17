@@ -12,15 +12,17 @@ To install just type:
 
     curl -s -L https://raw.github.com/guedes/pgvm/master/bin/pgvm-self-install | bash
 
-Then open a new terminal or type:
-
-    source ~/.bashrc
-
-and voilà!
+Then open a new terminal or type `source ~/.bashrc` on Linux, or `source ~/.bash_profile` on OS X and voilà!
 
 If you want to install it in another directory you could pass it to `--pgvm-home` like this:
 
     curl -s -L https://raw.github.com/guedes/pgvm/master/bin/pgvm-self-install  | bash -s -- --pgvm-home=/usr/local/pgvm
+
+OSes
+----
+
+`pgvm` was tested on Debian and OS X, please open a issue if you find a bug on this OSes
+
 
 An example session
 ------------------
@@ -33,7 +35,7 @@ You list all PostgreSQL installed version with the
 action `list`:
 
     $ pgvm list
-    Please, install a PostgreSQL Version!
+    Please install some PostgreSQL version using 'pgvm install'!
 
 As you can see, there isn't any. Lets install one
 using the action `install`:
@@ -282,13 +284,13 @@ See the [issue list of enhancements](https://github.com/guedes/pgvm/issues?label
 Origins
 -------
 
-`pgvm` was inspired by [rvm](https://rvm.beginrescueend.com), a Ruby enVironment Manager created by [Wayne E. Seguin](http://wayneseguin.us).
+`pgvm` was inspired by [rvm](https://rvm.io), a Ruby enVironment Manager created by [Wayne E. Seguin](http://wayneseguin.us).
 
 
 Copyright and License
 ---------------------
 
-Copyright (c) 2012 Dickson S. Guedes.
+Copyright (c) 2012,2013 Dickson S. Guedes.
 
 This module is free software; you can redistribute it and/or modify it under
 the [PostgreSQL License](http://www.opensource.org/licenses/postgresql).

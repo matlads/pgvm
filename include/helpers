@@ -21,13 +21,7 @@
 # and Dickson S. Guedes has no obligations to provide maintenance, support,
 # updates, enhancements, or modifications.
 
-shopt -s expand_aliases
-
-case $OSTYPE in
-    darwin*)
-        alias md5sum=create_osx_md5
-    ;;
-esac
+#shopt -s expand_aliases
 
 action_exists()
 {
@@ -47,6 +41,14 @@ execute_action()
 	else
 		execute_action help
 	fi
+}
+
+verify_env_vars()
+{
+  [[ -z $pgvm_environments ]] || [[ -z $pgvm_clusters ]] || [[ -z $pgvm_logs ]] && {
+    echo 'Could not continue. Variables $pgvm_environments, $pgvm_clusters, $pgvm_logs are not set.'
+    exit 1
+  }
 }
 
 parse_options()
@@ -159,14 +161,14 @@ seems_to_be_from_repo()
 
 local_repo_exists()
 {
-  pg_dest_dir=$pgvm_home/src/postgresql-clone
+  pg_dest_dir=$pgvm_src/postgresql-clone
   cd $pg_dest_dir 2>/dev/null && grep -i postgresql README &>/dev/null && git status &>/dev/null
 }
 
 checkout_postgres()
 {
   version=$1
-  pg_clone_dir=$pgvm_home/src/postgresql-clone
+  pg_clone_dir=$pgvm_src/postgresql-clone
   cd $pg_clone_dir && git checkout $version &>/dev/null && git clean -f &>/dev/null
 
   [[ $? -eq 1 ]] && echo "the branch '$version' seems to be invalid." && exit 1
@@ -174,7 +176,7 @@ checkout_postgres()
 
 clone_postgres()
 {
-  pg_dest_dir=$pgvm_home/src
+  pg_dest_dir=$pgvm_src
   pg_url=$(git_repo_url $version)
 
   echo "getting postgres from '$pg_url'"
@@ -191,13 +193,13 @@ get_postgres()
 
    if [ $version_length -eq 4 ]
    then
-      version=$(download http://www.postgresql.org/versions.rss - | grep "is the latest release in the" | sed "s/^.*\([0-9]\.[0-9]\+\.[0-9]\+\) is the latest release in the \([0-9]\.[0-9]\+\).*/\1/" |grep $version)
+      version=$(download http://www.postgresql.org/versions.rss - | grep "is the latest release in the" | sed -E "s/^.*([0-9]\.[0-9]+\.[0-9]+) is the latest release in the ([0-9]\.[0-9]+).*/\1/" |grep $version)
    elif [ $version_length -eq 2 ]
    then
-      version=$(download http://www.postgresql.org/versions.rss - | grep "is the latest release in the" | sed "s/^.*\([0-9]\.[0-9]\+\.[0-9]\+\) is the latest release in the \([0-9]\.[0-9]\+\).*/\1/" |grep ^"$version"|head -n1)
+      version=$(download http://www.postgresql.org/versions.rss - | grep "is the latest release in the" | sed -E "s/^.*([0-9]\.[0-9]+\.[0-9]+) is the latest release in the ([0-9]\.[0-9]+).*/\1/" |grep ^"$version"|head -n1)
    fi
 
-   pg_dest_dir=$pgvm_home/src
+   pg_dest_dir=$pgvm_src
    pg_url=$(postgres_download_url $version)
 
    mkdir -p $pg_dest_dir
@@ -213,7 +215,7 @@ get_postgres()
 
    echo -n "checking 'postgresql-$version.tar.gz' integrity... "
 
-   md5sum -c postgresql-$version.tar.gz.md5 >/dev/null 2>/dev/null
+   check_md5 postgresql-$version.tar.gz
 
    [[ $? -ne 0 ]] && echo "ERRO: CHECKSUM of 'postgresql-$version.tar.gz' has failed! Aborting!" && rm postgresql-$version.tar.gz* && exit 1
    echo "done."
@@ -222,7 +224,7 @@ get_postgres()
 extract_postgres()
 {
    version=${1:-$version}
-   pg_dest_dir=$pgvm_home/src
+   pg_dest_dir=$pgvm_src
 
    cd $pg_dest_dir
 
@@ -237,7 +239,7 @@ compile_and_install_postgres()
    version=${1:-$version}
    configure_options=${CONFIG_OPTS}
    make_options=${MAKE_OPTS}
-   pg_dest_dir=$pgvm_home/src
+   pg_dest_dir=$pgvm_src
 
    if seems_to_be_from_repo $version
    then
@@ -249,10 +251,10 @@ compile_and_install_postgres()
    fi
 
    cd $pg_dest_dir
-   mkdir -p $pgvm_home/environments/$version
+   mkdir -p ${pgvm_environments}/$version
 
    echo -n "configuring PostgreSQL Version: $version ... "
-   ./configure --prefix=$pgvm_home/environments/$version ${configure_options} --silent
+   ./configure --prefix=${pgvm_environments}/$version ${configure_options} --silent
    echo "done."
 
    echo -n "compiling ... "
@@ -270,7 +272,7 @@ version_is_installed()
 {
    version=${1:-$version}
 
-   [[ -d "${pgvm_home}/environments/$version" ]]
+   [[ -d "${pgvm_environments}/$version" ]]
 }
 
 create_symlinks()
@@ -278,8 +280,9 @@ create_symlinks()
    check_env
 
    version=${1:-$version}
-   mkdir --parents $pgvm_home/environments
-   ln --no-dereference --force --symbolic $pgvm_home/environments/$version $pgvm_home/environments/current
+   # we use short opts to compatibility with OSX
+   mkdir -p ${pgvm_environments}
+   ln -n -f -s ${pgvm_environments}/$version ${pgvm_environments}/current
    builtin hash -r
 }
 
@@ -288,16 +291,18 @@ check_env()
    [[ -z $pgvm_home ]] && echo "\$pgvm_home is not set!" && exit 1
 }
 
-create_osx_md5()
+check_md5()
 {
-    shift
     pg_file=$1
-    md5hash=( `cat $pg_file` `md5 -r ${pg_file/.md5/}` )
 
-    echo ${md5hash[2]}
-    echo ${md5hash[0]}
-
-    [[ ${md5hash[0]} == ${md5hash[2]} ]] && echo ${md5hash[1]}: "SUCCESS" || exit 1
+    case $OSTYPE in
+        darwin*)
+                 [[ "$(cat ${pg_file}.md5 | cut -d' ' -f1)" == "$(md5 -r ${pg_file} | cut -d' ' -f1)" ]]
+		 ;;
+              *)
+                 md5sum -c ${pg_file}.md5 >/dev/null 2>/dev/null
+                 ;;
+    esac
 }
 
 load_conf()
